@@ -9,32 +9,43 @@
             font-family: Arial, sans-serif;
             margin: 20px;
         }
-        label, input, button {
+        label, input, select, button {
             display: block;
             margin: 10px 0;
+        }
+        .holiday-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
     <h1>Business Hours Duration Calculator</h1>
     <form id="calculator">
-        <label for="startTime">Start Date and Time: (12-hour format, HH:MM:SS)</label>
+        <label for="startTime">Start Date and Time:</label>
         <input type="datetime-local" id="startTime" required step="1">
 
-        <label for="endTime">End Date and Time: (12-hour format, HH:MM:SS)</label>
+        <label for="endTime">End Date and Time:</label>
         <input type="datetime-local" id="endTime" required step="1">
 
-        <label for="startHour">Start CI Support Schedule (24-hour format, HH:MM:SS):</label>
-        <input type="time" id="startHour" value="07:00" required step="1">
+        <h2>CI Support Schedule</h2>
+        <label for="startHour">Business Start Time (HH:MM, 24-hour format):</label>
+        <input type="time" id="startHour" value="07:00" required>
 
-        <label for="endHour">End CI Support Schedule (24-hour format, HH:MM:SS):</label>
-        <input type="time" id="endHour" value="17:00" required step="1">
+        <label for="endHour">Business End Time (HH:MM, 24-hour format):</label>
+        <input type="time" id="endHour" value="17:00" required>
 
         <label for="days">Business Days (e.g., 1 for Monday, 5 for Friday):</label>
         <input type="text" id="days" value="1,2,3,4,5" placeholder="e.g., 1,2,3,4,5" required>
 
-        <label for="excludeHolidays">Exclude Australian Public Holidays:</label>
-        <input type="checkbox" id="excludeHolidays">
+        <label>Australian Public Holidays (Add holidays or exclude all):</label>
+        <div id="holidays">
+            <!-- Placeholder for added holidays -->
+        </div>
+        <button type="button" onclick="addHoliday()">Add Holiday</button>
+        <label><input type="checkbox" id="excludeAll" onchange="toggleHolidayInput()"> Exclude All Holidays</label>
 
         <button type="button" onclick="calculateDuration()">Calculate Duration</button>
     </form>
@@ -43,13 +54,35 @@
     <p id="result">Enter the start and end time above, set the business schedule, and click "Calculate Duration".</p>
 
     <script>
+        function addHoliday() {
+            const holidaysDiv = document.getElementById('holidays');
+            const holidayEntry = document.createElement('div');
+            holidayEntry.classList.add('holiday-entry');
+            holidayEntry.innerHTML = `
+                <input type="date" class="holiday-date" required>
+                <input type="text" class="holiday-name" placeholder="Holiday Name" required>
+                <button type="button" onclick="removeHoliday(this)">Remove</button>
+            `;
+            holidaysDiv.appendChild(holidayEntry);
+        }
+
+        function removeHoliday(button) {
+            button.parentElement.remove();
+        }
+
+        function toggleHolidayInput() {
+            const holidayInputs = document.querySelectorAll('.holiday-date, .holiday-name');
+            const excludeAll = document.getElementById('excludeAll').checked;
+            holidayInputs.forEach(input => input.disabled = excludeAll);
+        }
+
         function calculateDuration() {
             const startInput = document.getElementById('startTime').value;
             const endInput = document.getElementById('endTime').value;
-            const startHour = document.getElementById('startHour').value + ":00";
-            const endHour = document.getElementById('endHour').value + ":00";
+            const startHour = document.getElementById('startHour').value;
+            const endHour = document.getElementById('endHour').value;
             const daysInput = document.getElementById('days').value;
-            const excludeHolidays = document.getElementById('excludeHolidays').checked;
+            const excludeAll = document.getElementById('excludeAll').checked;
 
             if (!startInput || !endInput || !startHour || !endHour || !daysInput) {
                 alert("Please fill in all fields.");
@@ -68,41 +101,32 @@
             const endHourParts = endHour.split(':');
             const businessStartHour = parseInt(startHourParts[0]);
             const businessStartMinute = parseInt(startHourParts[1]);
-            const businessStartSecond = parseInt(startHourParts[2]);
             const businessEndHour = parseInt(endHourParts[0]);
             const businessEndMinute = parseInt(endHourParts[1]);
-            const businessEndSecond = parseInt(endHourParts[2]);
 
             const businessDays = daysInput.split(',').map(day => parseInt(day.trim()));
+            const selectedHolidays = excludeAll ? [] : Array.from(document.querySelectorAll('.holiday-entry')).map(entry => {
+                return {
+                    date: entry.querySelector('.holiday-date').value,
+                    name: entry.querySelector('.holiday-name').value
+                };
+            });
             let totalSeconds = 0;
-
-            // Define Australian public holidays (Example: 2024)
-            const publicHolidays = [
-                '2024-01-01', // New Year's Day
-                '2024-01-26', // Australia Day
-                '2024-03-29', // Good Friday
-                '2024-04-01', // Easter Monday
-                '2024-04-01', // Easter Saturday
-                '2024-04-25', // Anzac Day
-                '2024-06-10', // Queen's Birthday
-                '2024-12-25', // Christmas Day
-                '2024-12-26'  // Boxing Day
-            ];
 
             function isHoliday(date) {
                 const formattedDate = date.toISOString().split('T')[0];
-                return publicHolidays.includes(formattedDate);
+                return selectedHolidays.some(holiday => holiday.date === formattedDate);
             }
 
             for (let d = new Date(startDateTime); d <= endDateTime; d.setDate(d.getDate() + 1)) {
                 const dayOfWeek = d.getDay();
-                const isPublicHoliday = excludeHolidays && isHoliday(d);
+                const isPublicHoliday = isHoliday(d);
 
                 if (businessDays.includes(dayOfWeek) && !isPublicHoliday) {
                     const currentDayStart = new Date(d);
-                    currentDayStart.setHours(businessStartHour, businessStartMinute, businessStartSecond, 0);
+                    currentDayStart.setHours(businessStartHour, businessStartMinute, 0, 0);
                     const currentDayEnd = new Date(d);
-                    currentDayEnd.setHours(businessEndHour, businessEndMinute, businessEndSecond, 0);
+                    currentDayEnd.setHours(businessEndHour, businessEndMinute, 0, 0);
 
                     if (d.toDateString() === startDateTime.toDateString()) {
                         if (startDateTime < currentDayEnd) {
